@@ -4,9 +4,25 @@ import { Search, Filter, FileText, Info, Calendar, Clock, Book, Award, School } 
 import { fetchAssessmentData } from './services/googleSheetsService';
 import './App.css';
 
+// Pearson logo SVG inline as a component
+const PearsonLogo = () => (
+  <svg width="120" height="36" viewBox="0 0 120 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M60 18C60 27.9411 51.9411 36 42 36C32.0589 36 24 27.9411 24 18C24 8.05887 32.0589 0 42 0C51.9411 0 60 8.05887 60 18Z" fill="#003057"/>
+    <path d="M42 32C49.732 32 56 25.732 56 18C56 10.268 49.732 4 42 4C34.268 4 28 10.268 28 18C28 25.732 34.268 32 42 32Z" fill="white"/>
+    <path d="M42 28C47.5228 28 52 23.5228 52 18C52 12.4772 47.5228 8 42 8C36.4772 8 32 12.4772 32 18C32 23.5228 36.4772 28 42 28Z" fill="#003057"/>
+    <path d="M69 10H73.5C77.5 10 79.5 12 79.5 15C79.5 18 77.5 20 73.5 20H69V10ZM73.5 18C76 18 77 17 77 15C77 13 76 12 73.5 12H71.5V18H73.5Z" fill="#003057"/>
+    <path d="M87 14.5C87 15.5 86.5 16 85 16H83V13H85C86.5 13 87 13.5 87 14.5ZM89.5 14.5C89.5 12 88 10.5 85.5 10.5H80.5V20H83V18.5H85.5C88 18.5 89.5 17 89.5 14.5Z" fill="#003057"/>
+    <path d="M98 15.5H93V18H98.5V20H90.5V10.5H98.5V12.5H93V13.5H98V15.5Z" fill="#003057"/>
+    <path d="M105 15.5H100V18H105.5V20H97.5V10.5H105.5V12.5H100V13.5H105V15.5Z" fill="#003057"/>
+    <path d="M109.5 12.5V14H114V16H109.5V20H107V10.5H115V12.5H109.5Z" fill="#003057"/>
+    <path d="M116 20V10.5H118.5V20H116Z" fill="#003057"/>
+  </svg>
+);
+
 const App = () => {
   // State for the application
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [assessmentData, setAssessmentData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [activeQualification, setActiveQualification] = useState('all');
@@ -31,12 +47,14 @@ const App = () => {
     const loadData = async () => {
       try {
         setLoading(true);
+        setLoadError(null);
         const data = await fetchAssessmentData();
         setAssessmentData(data);
         setFilteredData(data);
         setLoading(false);
       } catch (error) {
         console.error('Error loading assessment data:', error);
+        setLoadError('Failed to load assessment data. Please try again later.');
         setLoading(false);
       }
     };
@@ -68,9 +86,9 @@ const App = () => {
         const search = searchTerm.toLowerCase();
         result = result.filter(
           item =>
-            item.componentName.toLowerCase().includes(search) ||
-            item.componentCode.toLowerCase().includes(search) ||
-            item.sector.toLowerCase().includes(search)
+            (item.componentName && item.componentName.toLowerCase().includes(search)) ||
+            (item.componentCode && item.componentCode.toLowerCase().includes(search)) ||
+            (item.sector && item.sector.toLowerCase().includes(search))
         );
       }
   
@@ -87,7 +105,7 @@ const App = () => {
   };
 
   // Get unique sectors for filter dropdown
-  const sectors = ['all', ...new Set(assessmentData.map(item => item.sector))];
+  const sectors = ['all', ...new Set(assessmentData.map(item => item.sector).filter(Boolean))];
 
   // Getting qualification badge based on type
   const getQualificationBadge = (qualification) => {
@@ -119,8 +137,30 @@ const App = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-gray-500">Loading assessment data...</div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="bg-white p-8 rounded-lg shadow-sm max-w-md text-center">
+          <div className="text-red-500 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+          <p className="text-gray-600 mb-4">{loadError}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+          >
+            Refresh Page
+          </button>
+        </div>
       </div>
     );
   }
@@ -136,11 +176,7 @@ const App = () => {
               <p className="text-gray-500 text-sm mt-1">Find information about external assessments for BTEC qualifications</p>
             </div>
             <div>
-              <img 
-                src="/logo.png" 
-                alt="Pearson Logo" 
-                className="h-10" 
-              />
+              <PearsonLogo />
             </div>
           </div>
         </div>
@@ -379,5 +415,3 @@ const App = () => {
     </div>
   );
 }
-
-export default App;
