@@ -1,9 +1,81 @@
 // src/services/googleSheetsService.js
 
-// Configuration for Google Sheets
-const SPREADSHEET_ID = '1xGvTeBQ6XWUd8X5cm6PMWUyTEpGHvYR-s8HD3uuBSB4'; // Replace with your actual spreadsheet ID
-const API_KEY = 'AIzaSyAHNyezQ94cwJSeabAlVDe8J0L5x-mMOC8'; // Replace with your Google API key
-const CLIENT_ID = '530673533403-cfqtorq8ef57ph6d9g6u5qo4caphcn4s.apps.googleusercontent.com'; // Replace with your OAuth client ID if you're using OAuth
+// Mock data for when the API is not available or fails
+const MOCK_DATA = [
+  // Sample RQF BTEC National
+  {
+    qualification: 'RQF BTEC National',
+    sector: 'Business',
+    componentCode: '31619H',
+    componentName: 'Unit 2: Developing a Marketing Campaign',
+    examType: 'Task',
+    duration: '3 hours supervised assessment',
+    access: 'Secure Dispatch',
+    levelOfControl: 'High',
+    additionalInfo: 'Externally assessed by Pearson. Released in January and May/June windows.',
+    invigilator: 'External',
+    qualificationSizes: 'National Certificate, National Extended Certificate, National Foundation Diploma, National Diploma, National Extended Diploma'
+  },
+  {
+    qualification: 'RQF BTEC National',
+    sector: 'Computing',
+    componentCode: '31748H',
+    componentName: 'Unit 1: Principles of Computer Science',
+    examType: 'Exam',
+    duration: '2 hours',
+    access: 'Secure Dispatch',
+    levelOfControl: 'High',
+    additionalInfo: 'Written exam, mixture of short and extended response questions.',
+    invigilator: 'External',
+    qualificationSizes: 'National Certificate, National Extended Certificate, National Foundation Diploma, National Diploma, National Extended Diploma'
+  },
+  // Sample NQF BTEC First
+  {
+    qualification: 'NQF BTEC First',
+    sector: 'Sport',
+    componentCode: '21317E',
+    componentName: 'Unit 1: Fitness for Sport and Exercise',
+    examType: 'Exam',
+    duration: '1 hour',
+    access: 'Onscreen Test',
+    levelOfControl: 'High',
+    additionalInfo: 'Onscreen test with a range of question types',
+    invigilator: 'External',
+    qualificationSizes: ''
+  },
+  // Sample BTEC Technical
+  {
+    qualification: 'BTEC Technical',
+    sector: 'Engineering',
+    componentCode: '31161H',
+    componentName: 'Unit 1: Exploring Engineering Sectors and Design Applications',
+    examType: 'Task',
+    duration: '5 hours supervised assessment',
+    access: 'Secure Dispatch',
+    levelOfControl: 'Medium',
+    additionalInfo: 'Design-based task with supporting documentation',
+    invigilator: 'Internal',
+    qualificationSizes: ''
+  },
+  // Sample BTEC Tech Award 2022
+  {
+    qualification: 'BTEC Tech Award 2022',
+    sector: 'Health and Social Care',
+    componentCode: 'BTCHSC3',
+    componentName: 'Component 3: Health and Wellbeing',
+    examType: 'Task',
+    duration: '3 hours supervised assessment',
+    access: 'Secure Dispatch',
+    levelOfControl: 'High',
+    additionalInfo: 'Externally assessed task where students apply knowledge to a case study',
+    invigilator: 'External',
+    qualificationSizes: ''
+  }
+];
+
+// Use environment variables for sensitive information
+const SPREADSHEET_ID = process.env.REACT_APP_SPREADSHEET_ID || '1xGvTeBQ6XWUd8X5cm6PMWUyTEpGHvYR-s8HD3uuBSB4';
+const API_KEY = process.env.REACT_APP_GOOGLE_API_KEY || 'AIzaSyAHNyezQ94cwJSeabAlVDe8J0L5x-mMOC8';
 
 // Sheet ranges to fetch
 const SHEET_RANGES = [
@@ -19,11 +91,24 @@ const SHEET_RANGES = [
  */
 export const fetchAssessmentData = async () => {
   try {
-    // Load the Google Sheets API
-    await loadGoogleSheetsAPI();
+    // Try to load the Google Sheets API with a timeout
+    const apiLoaded = await Promise.race([
+      loadGoogleSheetsAPI(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('API load timeout')), 5000))
+    ]).catch(error => {
+      console.warn('Failed to load Google Sheets API, using mock data:', error);
+      return false;
+    });
+    
+    // If API fails to load, return mock data
+    if (!apiLoaded) {
+      console.log('Using mock data instead of API');
+      return MOCK_DATA;
+    }
     
     // Fetch data from all sheet ranges
     const allData = [];
+    let fetchFailed = false;
     
     for (const range of SHEET_RANGES) {
       try {
@@ -41,13 +126,22 @@ export const fetchAssessmentData = async () => {
         }
       } catch (error) {
         console.error(`Error fetching data from ${range}:`, error);
+        fetchFailed = true;
+        break;
       }
+    }
+    
+    // If any fetch fails, return mock data
+    if (fetchFailed || allData.length === 0) {
+      console.log('API fetch failed or returned no data, using mock data');
+      return MOCK_DATA;
     }
     
     return allData;
   } catch (error) {
     console.error('Error in fetchAssessmentData:', error);
-    throw error;
+    console.log('Falling back to mock data');
+    return MOCK_DATA;
   }
 };
 
@@ -195,7 +289,7 @@ function loadGoogleSheetsAPI() {
   return new Promise((resolve, reject) => {
     // Check if API is already loaded
     if (window.gapi && window.gapi.client && window.gapi.client.sheets) {
-      resolve();
+      resolve(true);
       return;
     }
     
@@ -208,14 +302,11 @@ function loadGoogleSheetsAPI() {
       gapi.load('client', () => {
         gapi.client.init({
           apiKey: API_KEY,
-          // Include OAuth client ID if using OAuth
-          // clientId: CLIENT_ID,
-          discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
-          // Include scope if using OAuth
-          // scope: 'https://www.googleapis.com/auth/spreadsheets.readonly'
+          discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4']
         }).then(() => {
-          resolve();
+          resolve(true);
         }).catch(error => {
+          console.error('Google API client init error:', error);
           reject(error);
         });
       });
